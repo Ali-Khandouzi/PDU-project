@@ -1,0 +1,6 @@
+../Core/Src/tasks.c:7:6:TaskReceive	3
+../Core/Src/tasks.c:38:6:TaskTransmit	2
+../Core/Src/tasks.c:53:6:TaskPeriodic	1
+../Core/Src/tasks.c:64:6:TaskButton	2
+../Core/Src/tasks.c:81:6:TaskLED	2
+../Core/Src/tasks.c:106:6:TaskADC	3

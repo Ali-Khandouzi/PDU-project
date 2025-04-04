@@ -1,0 +1,4 @@
+../Core/Src/bsp.c:13:6:SystemClock_Config	4
+../Core/Src/bsp.c:63:6:MX_ADC3_Init	3
+../Core/Src/bsp.c:102:6:MX_USART2_UART_Init	2
+../Core/Src/bsp.c:123:6:MX_GPIO_Init	1
