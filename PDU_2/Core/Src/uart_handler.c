@@ -4,7 +4,7 @@
 extern UART_HandleTypeDef huart2;
 //uint8_t pdu_buffer[PDU_LENGTH + 1];	// +1 for null terminator
 
-void PrintTransmited(PDU *pdu) {
+void PrintTransmitted(PDU *pdu) {
 	// Print the PDU contents
 	printf("Transmit_Task received a PDU:\r\n");
 	printf("Header: 0x%02X\r\n", pdu->header);

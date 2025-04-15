@@ -43,6 +43,11 @@ OS_FLAG_GRP *event_flags;
 
 uint8_t pdu_buffer[PDU_LENGTH + 1];
 
+#define PDU_POOL_SIZE 10  // Number of PDUs in pool
+
+OS_MEM *pdu_pool;  // Memory pool handle
+PDU pdu_pool_buffer[PDU_POOL_SIZE];  // Static memory for PDUs
+
 int main(void)
 {
   HAL_Init();
@@ -62,6 +67,14 @@ int main(void)
 
   // Create Event Object
   event_flags = OSFlagCreate(0x00, &err); // Initial flags = 0
+
+  // Create memory pool for PDUs
+  pdu_pool = OSMemCreate(
+	  (void *)pdu_pool_buffer,  // Memory buffer
+	  PDU_POOL_SIZE,            // Number of blocks
+	  sizeof(PDU),              // Block size
+	  &err
+  );
 
   // Create the queue
   tx_queue = OSQCreate((void **)&pdu_queue_buffer[0], QUEUE_SIZE);

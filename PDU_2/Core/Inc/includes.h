@@ -25,5 +25,4 @@
 #include "os_trace.h"
 
 
-
 #endif /* INC_INCLUDES_H_ */

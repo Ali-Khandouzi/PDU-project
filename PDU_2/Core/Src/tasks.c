@@ -2,63 +2,79 @@
 #include "pdu.h"
 #include "uart_handler.h"
 #include "adc_handler.h"
+#include "main.h"
 
-// Task implementations
+// Function prototype
+void LEDBlink(INT32U blink_frequency_ms);
+extern OS_MEM *pdu_pool;
+
 void TaskReceive(void* pdata) {
-	static PDU received_pdu;
+    PDU *received_pdu;  // Pointer to dynamically allocated PDU
     OS_ERR err;
     OS_FLAGS flags;
 
     while (1) {
-    	// Wait for UART data (auto-clear flag)
-		flags = OSFlagPend(event_flags, UART_RX_EVENT, OS_FLAG_WAIT_SET_ALL + OS_FLAG_CONSUME, 0, &err);
-		if (flags & UART_RX_EVENT) {
+        flags = OSFlagPend(event_flags, UART_RX_EVENT, OS_FLAG_WAIT_SET_ALL + OS_FLAG_CONSUME, 0, &err);
+        if (flags & UART_RX_EVENT) {
+            // Allocate PDU from pool
+            received_pdu = (PDU *)OSMemGet(pdu_pool, &err);
+            if (err != OS_ERR_NONE) {
+                continue;  // Skip if allocation fails
+            }
 
-			// Clear all old data
-			memset(&received_pdu, 0, sizeof(PDU));
-			// Receive Header (Hex), Receive SID (Hex), Receive Payload (Decimal)
-			received_pdu.header = AsciiHexToByte(pdu_buffer[0], pdu_buffer[1]);
-			received_pdu.sid = AsciiHexToByte(pdu_buffer[2], pdu_buffer[3]);
-			uint16_t payload = (uint16_t)atoi((char*)pdu_buffer + 4);
+            // Process UART data into received_pdu
+            memset(received_pdu, 0, sizeof(PDU));
+            received_pdu->header = AsciiHexToByte(pdu_buffer[0], pdu_buffer[1]);
+            received_pdu->sid = AsciiHexToByte(pdu_buffer[2], pdu_buffer[3]);
+            uint16_t payload = (uint16_t)atoi((char*)pdu_buffer + 4);
+            memcpy(&received_pdu->data[2], &payload, sizeof(payload));
 
-			// Prepare PDU, Sending to other tasks.
-			memcpy(&received_pdu.data[2], &payload, sizeof(payload));
+            // Validate and route PDU
+            if (!validate_pdu_header(received_pdu)) {
+                OSMemPut(pdu_pool, received_pdu);  // Free before sending error
+                SendNegativeResponse(0x7F);
+            } else {
+                process_received_pdu(received_pdu);
+            }
+        }
+    }
+}
+void TaskTransmit(void *pdata) {
+    PDU *pdu_rx;
+    OS_ERR err;
+    OS_FLAGS flags;
 
-			// Validate and process PDU
-			if (!validate_pdu_header(&received_pdu)) {
-				SendNegativeResponse(0x7F);
-				continue;
-			}
-
-			process_received_pdu(&received_pdu);
-		}
+    while(1) {
+        flags = OSFlagPend(event_flags, TRANSMIT_EVENT, OS_FLAG_WAIT_SET_ALL + OS_FLAG_CONSUME, 0, &err);
+        if (flags & TRANSMIT_EVENT) {
+            pdu_rx = (PDU *)OSQPend(tx_queue, 0, &err);
+            if (err == OS_ERR_NONE) {
+                PrintTransmitted(pdu_rx);
+                OSMemPut(pdu_pool, pdu_rx);  // Release memory after use
+            }
+        }
     }
 }
 
-void TaskTransmit(void *pdata) {
-	PDU *pdu_rx;
-	INT8U err;
-	OS_FLAGS flags;
-
-	while(1) {
-		flags = OSFlagPend(event_flags, TRANSMIT_EVENT, OS_FLAG_WAIT_SET_ALL + OS_FLAG_CONSUME, 0, &err);
-		if (flags & TRANSMIT_EVENT) {
-			// Wait for a PDU from the queue
-			pdu_rx = (PDU *)OSQPend(tx_queue, 0, &err);
-			PrintTransmited(pdu_rx);
-		}
-	}
-}
-
 void TaskPeriodic(void *pdata) {
-	PDU periodic_temp_pdu = {PDU_HEADER, SID_ADC_READ, {0x01}};
-	OS_ERR err;
-	while(1) {
-		// Periodic Default PDU sending to ADC task
-		OSQPost(tx_queue, (void*)&periodic_temp_pdu);  // Forward to ADC task
-		OSFlagPost(event_flags, ADC_EVENT, OS_FLAG_SET, &err);
-		OSTimeDlyHMSM(0, 0, 10, 0);
-	}
+    PDU *periodic_temp_pdu;
+    OS_ERR err;
+
+    while(1) {
+        // Allocate PDU from memory pool
+        periodic_temp_pdu = (PDU *)OSMemGet(pdu_pool, &err);
+        if (err == OS_ERR_NONE) {
+            // Initialize the PDU
+            periodic_temp_pdu->header = PDU_HEADER;
+            periodic_temp_pdu->sid = SID_ADC_READ;
+            memset(periodic_temp_pdu->data, 0, sizeof(periodic_temp_pdu->data));
+            periodic_temp_pdu->data[0] = 0x01;  // Example payload
+
+            OSQPost(tx_queue, (void *)periodic_temp_pdu);
+            OSFlagPost(event_flags, ADC_EVENT, OS_FLAG_SET, &err);
+        }
+        OSTimeDlyHMSM(0, 0, 10, 0);  // Delay 10 seconds
+    }
 }
 
 void TaskButton(void *pdata) {
@@ -99,6 +115,8 @@ void TaskLED(void *pdata) {
 			memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
 			// Send Positive Response
 			SendPositiveResponse(SID_LED_BLINK);
+			// Free the received PDU
+			OSMemPut(pdu_pool, pdu_rx);
     	}
     }
 }
@@ -128,6 +146,8 @@ void TaskADC(void *pdata) {
 				memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
 				// Send Positive Response 0x5A 0x3B 0xAA ...
 				SendPositiveResponse(SID_ADC_READ);
+				// Free the received PDU
+				OSMemPut(pdu_pool, pdu_rx);
 
 			} else {
 				// Read temperature and apply offset
@@ -136,6 +156,8 @@ void TaskADC(void *pdata) {
 				memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
 				// Sending Periodic Temperature = 0x5A 0x3B 0x01 temperature
 				SendTemperature(temp);
+				// Free the received PDU
+				OSMemPut(pdu_pool, pdu_rx);
 			}
 		}
 	}

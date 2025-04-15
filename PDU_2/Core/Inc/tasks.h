@@ -4,9 +4,9 @@
 // Task priorities
 #define TASK_BUTTON_PRIORITY     5
 #define TASK_RECEIVE_PRIORITY    6
-#define TASK_TRANSMIT_PRIORITY   7
-#define TASK_ADC_PRIORITY        9
-#define TASK_LED_PRIORITY        8
+#define TASK_TRANSMIT_PRIORITY   9
+#define TASK_ADC_PRIORITY        8
+#define TASK_LED_PRIORITY        7
 #define TASK_PERIODIC_PRIORITY   10
 
 // Task stack sizes

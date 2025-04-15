@@ -1,6 +1,8 @@
 #include "pdu.h"
 #include "tasks.h"
 #include "includes.h"
+extern OS_MEM *pdu_pool;
+
 
 /* PDU Processing Functions */
 bool validate_pdu_header(const PDU* pdu) {
@@ -46,27 +48,31 @@ void process_received_pdu(PDU* pdu) {
 }
 
 void SendPositiveResponse(uint8_t sid) {
-	INT8U err;
-	static PDU response;
+    INT8U err;
+    PDU *response = (PDU *)OSMemGet(pdu_pool, &err);  // Allocate from pool
 
-	response.header = PDU_HEADER;
-	response.sid = sid;
-	memset(response.data, 0xFF, sizeof(response.data));
-	response.data[0] = 0xAA;  // Error code
+    if (err == OS_ERR_NONE) {
+        response->header = PDU_HEADER;
+        response->sid = sid;
+        memset(response->data, 0xFF, sizeof(response->data));
+        response->data[0] = 0xAA;  // Success code
 
-	OSQPost(tx_queue, (void*)&response);
-	OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+        OSQPost(tx_queue, (void *)response);  // µC/OS-II uses 2 arguments
+        OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+    }
 }
 
 void SendNegativeResponse(uint8_t wrongsid) {
-	INT8U err;
-    static PDU response;
+    OS_ERR err;
+    PDU *response = (PDU *)OSMemGet(pdu_pool, &err);  // Allocate from pool
 
-    response.header = PDU_HEADER;
-	response.sid = wrongsid;
-	memset(response.data, 0xFF, sizeof(response.data));
-	response.data[0] = 0x7F;  // Error code
+    if (err == OS_ERR_NONE) {
+        response->header = PDU_HEADER;
+        response->sid = wrongsid;
+        memset(response->data, 0xFF, sizeof(response->data));
+        response->data[0] = 0x7F;  // Error code
 
-    OSQPost(tx_queue, (void*)&response);
-    OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+        OSQPost(tx_queue, (void *)response);
+        OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+    }
 }

@@ -3,6 +3,8 @@
 #include "pdu.h"
 
 extern ADC_HandleTypeDef hadc3;
+extern OS_MEM *pdu_pool;
+
 
 uint8_t OffsetAddtoTemp(uint8_t offsett) {
 	uint8_t temp = tempfunction();
@@ -10,20 +12,20 @@ uint8_t OffsetAddtoTemp(uint8_t offsett) {
 }
 
 void SendTemperature(uint8_t temperature) {
-	INT8U err;
-    static PDU response;
+    INT8U err;
+    PDU *response = (PDU *)OSMemGet(pdu_pool, &err);  // Allocate from pool
 
-    response.header = PDU_HEADER;
-	response.sid = SID_ADC_READ;
-	memset(response.data, 0xFF, sizeof(response.data));
-	response.data[0] = 0x01;
-	// Store temperature in PDU
-	memcpy(&response.data[5], &temperature, sizeof(temperature));
-	printf("Temperature2 = %d\r\n", response.data[5]);
+    if (err == OS_ERR_NONE) {
+        response->header = PDU_HEADER;
+        response->sid = SID_ADC_READ;
+        memset(response->data, 0xFF, sizeof(response->data));
+        response->data[0] = 0x01;
+        memcpy(&response->data[5], &temperature, sizeof(temperature));
+        printf("Temperature2 = %d\r\n", response->data[5]);
 
-	err = OSQPost(tx_queue, (void*)&response);
-    OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
-    memset(response.data, 0, sizeof(response.data));
+        OSQPost(tx_queue, (void *)response);
+        OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+    }
 }
 
 float tempfunction(void) {

@@ -36,7 +36,7 @@ Core/Src/tasks.o: ../Core/Src/tasks.c ../Core/Inc/tasks.h \
  ../Middlewares/uCOSII/Source/os.h ../Middlewares/uCOSII/Source/ucos_ii.h \
  ../Core/Inc/includes.h ../Middlewares/uCOSII/Source/ucos_ii.h \
  ../Middlewares/uCOSII/Source/os_trace.h ../Core/Inc/uart_handler.h \
- ../Core/Inc/adc_handler.h
+ ../Core/Inc/adc_handler.h ../Core/Inc/main.h
 ../Core/Inc/tasks.h:
 ../Core/Inc/pdu.h:
 ../Core/Inc/main.h:
@@ -82,3 +82,4 @@ Core/Src/tasks.o: ../Core/Src/tasks.c ../Core/Inc/tasks.h \
 ../Middlewares/uCOSII/Source/os_trace.h:
 ../Core/Inc/uart_handler.h:
 ../Core/Inc/adc_handler.h:
+../Core/Inc/main.h:
