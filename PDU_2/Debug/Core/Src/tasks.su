@@ -1,6 +1,6 @@
 ../Core/Src/tasks.c:11:6:TaskReceive	40	static
-../Core/Src/tasks.c:42:6:TaskTransmit	40	static
+../Core/Src/tasks.c:42:6:TaskTransmit	24	static
 ../Core/Src/tasks.c:59:6:TaskPeriodic	24	static
 ../Core/Src/tasks.c:80:6:TaskButton	40	static
-../Core/Src/tasks.c:97:6:TaskLED	40	static
-../Core/Src/tasks.c:124:6:TaskADC	40	static
+../Core/Src/tasks.c:104:6:TaskLED	24	static
+../Core/Src/tasks.c:131:6:TaskADC	24	static

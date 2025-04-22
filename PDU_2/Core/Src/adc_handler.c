@@ -24,7 +24,7 @@ void SendTemperature(uint8_t temperature) {
         printf("Temperature2 = %d\r\n", response->data[5]);
 
         OSQPost(tx_queue, (void *)response);
-        OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+        //OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
     }
 }
 

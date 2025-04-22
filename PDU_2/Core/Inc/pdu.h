@@ -19,7 +19,9 @@ typedef struct {
 } PDU;
 
 // Shared queue and flags
-extern OS_EVENT *tx_queue;				// Global queue pointer
+extern OS_EVENT *tx_queue;		// Global queue pointer
+extern OS_EVENT *led_queue;
+extern OS_EVENT *adc_queue;
 extern OS_FLAG_GRP *event_flags;
 
 // PDU processing functions

@@ -39,6 +39,9 @@ OS_STK	Task_Periodic_stk[TASK_STACKSIZE];
 PDU *pdu_queue_buffer[QUEUE_SIZE]; // Queue buffer (array of PDU pointers)
 
 OS_EVENT *tx_queue;				// Global queue pointer
+OS_EVENT *led_queue;
+OS_EVENT *adc_queue;
+
 OS_FLAG_GRP *event_flags;
 
 uint8_t pdu_buffer[PDU_LENGTH + 1];
@@ -78,10 +81,8 @@ int main(void)
 
   // Create the queue
   tx_queue = OSQCreate((void **)&pdu_queue_buffer[0], QUEUE_SIZE);
-  if (tx_queue == NULL) {
-	  printf("Queue initialization failed\r\n");
-	  Error_Handler();
-  }
+  led_queue = OSQCreate((void **)&pdu_queue_buffer[0], QUEUE_SIZE);
+  adc_queue = OSQCreate((void **)&pdu_queue_buffer[0], QUEUE_SIZE);
 
   OSTaskCreateExt(TaskReceive,
       		  	  	  NULL,

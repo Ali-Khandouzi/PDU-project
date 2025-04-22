@@ -45,13 +45,11 @@ void TaskTransmit(void *pdata) {
     OS_FLAGS flags;
 
     while(1) {
-        flags = OSFlagPend(event_flags, TRANSMIT_EVENT, OS_FLAG_WAIT_SET_ALL + OS_FLAG_CONSUME, 0, &err);
-        if (flags & TRANSMIT_EVENT) {
-            pdu_rx = (PDU *)OSQPend(tx_queue, 0, &err);
-            if (err == OS_ERR_NONE) {
-                PrintTransmitted(pdu_rx);
-                OSMemPut(pdu_pool, pdu_rx);  // Release memory after use
-            }
+
+		pdu_rx = (PDU *)OSQPend(tx_queue, 0, &err);
+		if (err == OS_ERR_NONE) {
+			PrintTransmitted(pdu_rx);
+			OSMemPut(pdu_pool, pdu_rx);  // Release memory after use
         }
     }
 }
@@ -70,15 +68,14 @@ void TaskPeriodic(void *pdata) {
             memset(periodic_temp_pdu->data, 0, sizeof(periodic_temp_pdu->data));
             periodic_temp_pdu->data[0] = 0x01;  // Example payload
 
-            OSQPost(tx_queue, (void *)periodic_temp_pdu);
-            OSFlagPost(event_flags, ADC_EVENT, OS_FLAG_SET, &err);
+            OSQPost(adc_queue, (void *)periodic_temp_pdu);
         }
         OSTimeDlyHMSM(0, 0, 10, 0);  // Delay 10 seconds
     }
 }
 
 void TaskButton(void *pdata) {
-	PDU pdu_tx = {PDU_HEADER, SID_BUTTON_EVENT, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01}};
+	PDU *pdu_tx;
 	INT8U err;
 	OS_FLAGS flags;
 	while(1) {
@@ -87,9 +84,14 @@ void TaskButton(void *pdata) {
 		flags = OSFlagPend(event_flags, BUTTON_EVENT, OS_FLAG_WAIT_SET_ALL + OS_FLAG_CONSUME, 0, &err);
 
 		if (flags & BUTTON_EVENT) {
+			pdu_tx = (PDU *)OSMemGet(pdu_pool, &err);
+			// Initialize the PDU
+			pdu_tx->header = PDU_HEADER;
+			pdu_tx->sid = SID_BUTTON_EVENT;
+			memset(pdu_tx->data, 0xFF, sizeof(pdu_tx->data));
+			pdu_tx->data[5] = 0x01;  // Example payload
 			// Send Button Response
-			err = OSQPost(tx_queue, (void*)&pdu_tx); // Post to transmit queue
-			OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+			err = OSQPost(tx_queue, (void*)pdu_tx); // Post to transmit queue
 		}
 	}
 }
@@ -101,23 +103,18 @@ void TaskLED(void *pdata) {
 	uint16_t blink_frequency;
 
     while(1) {
-
-    	flags = OSFlagPend(event_flags, LED_EVENT, OS_FLAG_WAIT_SET_ALL + OS_FLAG_CONSUME, 0, &err);
-
-    	if (flags & LED_EVENT) {
-    		// Receiving PDU from Queue
-    		pdu_rx = (PDU *)OSQPend(tx_queue, 0, &err);
-    		// Extract frequency from PDU payload
-    		memcpy(&blink_frequency, &pdu_rx->data[2], sizeof(uint16_t));
-			// Blink LED
-			LEDBlink(blink_frequency);
-			// Clear previous data
-			memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
-			// Send Positive Response
-			SendPositiveResponse(SID_LED_BLINK);
-			// Free the received PDU
-			OSMemPut(pdu_pool, pdu_rx);
-    	}
+		// Receiving PDU from Queue
+		pdu_rx = (PDU *)OSQPend(led_queue, 0, &err);
+		// Extract frequency from PDU payload
+		memcpy(&blink_frequency, &pdu_rx->data[2], sizeof(uint16_t));
+		// Blink LED
+		LEDBlink(blink_frequency);
+		// Clear previous data
+		memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
+		// Send Positive Response
+		SendPositiveResponse(SID_LED_BLINK);
+		// Free the received PDU
+		OSMemPut(pdu_pool, pdu_rx);
     }
 }
 
@@ -130,35 +127,30 @@ void TaskADC(void *pdata) {
 	INT8U err;
 
 	while(1) {
-		// Wait for ADC_EVENT
-		flags = OSFlagPend(event_flags, ADC_EVENT, OS_FLAG_WAIT_SET_ANY + OS_FLAG_CONSUME, 0, &err);
+		// Receiving PDU from Queue
+		pdu_rx = (PDU *)OSQPend(adc_queue, 0, &err);
+		// Check if a new offset inserted
+		if (pdu_rx->data[0] == 2) {
+			// Extract offset from PDU payload
+			memcpy(&offset, &pdu_rx->data[2], sizeof(offset));
+			// Read temperature and apply offset
+			temp = OffsetAddtoTemp(offset);
+			// Clear pdu_rx
+			memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
+			// Send Positive Response 0x5A 0x3B 0xAA ...
+			SendPositiveResponse(SID_ADC_READ);
+			// Free the received PDU
+			OSMemPut(pdu_pool, pdu_rx);
 
-		if (flags & ADC_EVENT) {
-			// Receiving PDU from Queue
-			pdu_rx = (PDU *)OSQPend(tx_queue, 0, &err);
-			// Check if a new offset inserted
-			if (pdu_rx->data[0] == 2) {
-				// Extract offset from PDU payload
-				memcpy(&offset, &pdu_rx->data[2], sizeof(offset));
-				// Read temperature and apply offset
-				temp = OffsetAddtoTemp(offset);
-				// Clear pdu_rx
-				memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
-				// Send Positive Response 0x5A 0x3B 0xAA ...
-				SendPositiveResponse(SID_ADC_READ);
-				// Free the received PDU
-				OSMemPut(pdu_pool, pdu_rx);
-
-			} else {
-				// Read temperature and apply offset
-				temp = OffsetAddtoTemp(offset);
-				// Clear pdu_rx
-				memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
-				// Sending Periodic Temperature = 0x5A 0x3B 0x01 temperature
-				SendTemperature(temp);
-				// Free the received PDU
-				OSMemPut(pdu_pool, pdu_rx);
-			}
+		} else {
+			// Read temperature and apply offset
+			temp = OffsetAddtoTemp(offset);
+			// Clear pdu_rx
+			memset(pdu_rx->data, 0, sizeof(pdu_rx->data));
+			// Sending Periodic Temperature = 0x5A 0x3B 0x01 temperature
+			SendTemperature(temp);
+			// Free the received PDU
+			OSMemPut(pdu_pool, pdu_rx);
 		}
 	}
 }

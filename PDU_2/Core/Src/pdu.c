@@ -25,8 +25,8 @@ void process_received_pdu(PDU* pdu) {
     switch (pdu->sid) {
         case SID_LED_BLINK:
             if (validate_led_payload(payload)) {
-                OSQPost(tx_queue, pdu);
-                OSFlagPost(event_flags, LED_EVENT, OS_FLAG_SET, &err);
+                OSQPost(led_queue, pdu);
+                //OSFlagPost(event_flags, LED_EVENT, OS_FLAG_SET, &err);
             } else {
                 SendNegativeResponse(pdu->sid);
             }
@@ -35,8 +35,8 @@ void process_received_pdu(PDU* pdu) {
         case SID_ADC_READ:
             pdu->data[0] = 2;
             if (validate_adc_payload(payload)) {
-                OSQPost(tx_queue, pdu);
-                OSFlagPost(event_flags, ADC_EVENT, OS_FLAG_SET, &err);
+                OSQPost(adc_queue, pdu);
+                //OSFlagPost(event_flags, ADC_EVENT, OS_FLAG_SET, &err);
             } else {
                 SendNegativeResponse(pdu->sid);
             }
@@ -58,7 +58,7 @@ void SendPositiveResponse(uint8_t sid) {
         response->data[0] = 0xAA;  // Success code
 
         OSQPost(tx_queue, (void *)response);  // µC/OS-II uses 2 arguments
-        OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+        //OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
     }
 }
 
@@ -73,6 +73,6 @@ void SendNegativeResponse(uint8_t wrongsid) {
         response->data[0] = 0x7F;  // Error code
 
         OSQPost(tx_queue, (void *)response);
-        OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
+        //OSFlagPost(event_flags, TRANSMIT_EVENT, OS_FLAG_SET, &err);
     }
 }
